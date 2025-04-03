@@ -4,6 +4,7 @@
 
 #include "Styling/SlateBrush.h"
 #include "Textures/SlateIcon.h"
+#include "Misc/EngineVersionComparison.h"
 #include "SlateIconReference.generated.h"
 
 class USlateBrushAsset;
@@ -45,11 +46,12 @@ public:
 	FSlateIconReference() = default;
 	explicit FSlateIconReference(const FName& InStyleSetName);
 	explicit FSlateIconReference(const FSlateIcon& InIcon);
-	FSlateIconReference(const FName InStyleSetName, const FName InStyleName, const FName InSmallStyleName = NAME_None, const FName InStatusOverlayStyleName = NAME_None);
 
-	operator FSlateIcon() const
+	FSlateIconReference(FName InStyleSetName, FName InStyleName, FName InSmallStyleName = NAME_None, FName InStatusOverlayStyleName = NAME_None);
+
+	explicit operator FSlateIcon() const
 	{
-		return FSlateIcon(StyleSetName, IconName, SmallIconName, OverlayIconName);
+		return ToSlateIcon();
 	}
 
 	FSlateIconReference& operator=(const FSlateIcon& Other);

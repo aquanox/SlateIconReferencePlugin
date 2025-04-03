@@ -6,6 +6,7 @@
 #include "PropertyHandle.h"
 #include "PropertyEditorModule.h"
 #include "SlateIconRefDataHelper.h"
+#include "Misc/EngineVersionComparison.h"
 
 DEFINE_LOG_CATEGORY(LogSlateIcon);
 

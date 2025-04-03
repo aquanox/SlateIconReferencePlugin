@@ -19,7 +19,7 @@ class SSlateIconStaticPreview : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SSlateIconStaticPreview)
-		 {}
+		: _AutoRefresh(true) {}
 		SLATE_ARGUMENT(TSharedPtr<IPropertyHandle>, SourceProperty)
 		SLATE_ARGUMENT(TSharedPtr<FSlateIconDescriptor>, SourceDescriptor)
 		SLATE_ATTRIBUTE(float, TargetHeight)

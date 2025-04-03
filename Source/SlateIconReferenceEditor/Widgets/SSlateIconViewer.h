@@ -5,7 +5,7 @@
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/Input/SComboBox.h"
-#include "SlateIconRefDataHelper.h"
+#include "Internal/SlateIconRefDataHelper.h"
 #include "Widgets/Views/STableRow.h"
 #include "Widgets/Views/SListView.h"
 #include "Misc/TextFilterExpressionEvaluator.h"
@@ -73,11 +73,7 @@ public:
 	// }
 
 	// { menu - list
-	struct FViewItem
-	{
-		TSharedPtr<FSlateIconDescriptor> IconDescriptor;
-		bool bPassesFilter =false;
-	};
+	using FViewItem = FSlateIconDescriptor;
 	TSharedRef<ITableRow>  IconViewerList_GenerateRow(TSharedPtr<FViewItem> Item, const TSharedRef<STableViewBase>& OwnerTable);
 	void IconViewerList_SelectionChanged( TSharedPtr<FViewItem> Item, ESelectInfo::Type SelectInfo );
 	// }

@@ -4,6 +4,7 @@
 #include "Modules/ModuleManager.h"
 #include "Misc/EngineVersionComparison.h"
 #include "Slate/SlateBrushAsset.h"
+#include "Styling/ISlateStyle.h"
 #include "Styling/SlateColor.h"
 #include "Styling/StyleDefaults.h"
 
@@ -22,7 +23,7 @@ FSlateIconReference::FSlateIconReference(const FSlateIcon& InIcon)
 	operator=(InIcon);
 }
 
-FSlateIconReference::FSlateIconReference(const FName InStyleSetName, const FName InStyleName, const FName InSmallStyleName, const FName InStatusOverlayStyleName)
+FSlateIconReference::FSlateIconReference(FName InStyleSetName, FName InStyleName, FName InSmallStyleName, FName InStatusOverlayStyleName)
 	: StyleSetName(InStyleSetName), IconName(InStyleName), SmallIconName(InSmallStyleName), OverlayIconName(InStatusOverlayStyleName)
 {
 }
@@ -45,16 +46,12 @@ FSlateIconReference& FSlateIconReference::operator=(const FSlateIcon& Other)
 
 FSlateIcon FSlateIconReference::ToSlateIcon() const
 {
+#if UE_VERSION_OLDER_THAN(5, 0, 0)
+	return FSlateIcon(StyleSetName, IconName, (SmallIconName == NAME_None) ? ISlateStyle::Join(IconName, ".Small") :  SmallIconName);
+#else
 	return FSlateIcon(StyleSetName, IconName, SmallIconName, OverlayIconName);
+#endif
 }
-
-// USlateBrushAsset* FSlateIconReference::ToSlateBrushAsset()
-// {
-// 	FName CombinedName = *FNameBuilder(StyleSetName).Append(TEXT("_")).Append(IconName.ToString());
-// 	USlateBrushAsset* Asset = NewObject<USlateBrushAsset>(GetTransientPackage(), CombinedName, RF_Transient);
-// 	Asset->Brush = *GetIcon();
-// 	return Asset;
-// }
 
 const ISlateStyle* FSlateIconReference::GetStyleSet() const
 {
@@ -84,5 +81,10 @@ const FSlateBrush* FSlateIconReference::GetOverlayIcon() const
 
 const FSlateBrush* FSlateIconReference::GetOptionalOverlayIcon() const
 {
+#if UE_VERSION_OLDER_THAN(5, 0, 0)
+	const ISlateStyle* StyleSet = GetStyleSet();
+	return StyleSet ? StyleSet->GetOptionalBrush(OverlayIconName) : nullptr;
+#else
 	return ToSlateIcon().GetOverlayIcon();
+#endif
 }

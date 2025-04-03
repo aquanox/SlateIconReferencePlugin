@@ -72,7 +72,7 @@ bool USlateIconRefExampleSmall::SupportsAutoRegistration() const
 const TArray<FName>& USlateIconRefExample::GetStyleSetNames() const
 {
 	static TArray<FName>  Result;
-	if (Result.IsEmpty())
+	if (Result.Num() == 0)
 	{
 		Result.Add(FName());
 		for (auto& Desc : FSlateIconRefDataHelper::GetDataSource().GetStyleSets())

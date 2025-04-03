@@ -34,9 +34,9 @@ public:
 
 More examples can be found at `SlateIconRefExample.h`
 
-## Supported Engines
+## Supported Engine Versions
 
-Tested with Unreal Engine 5.4 and 5.5, should work in newer versions without additional changes, older may need backporting.
+Compiles with Unreal Engine 4.27, 5.3-5.5, should work in newer engines without additional changes.
 
 ## Contributing
 

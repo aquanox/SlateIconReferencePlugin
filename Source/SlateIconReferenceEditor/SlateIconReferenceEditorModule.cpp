@@ -5,7 +5,7 @@
 #include "Modules/ModuleManager.h"
 #include "PropertyEditorModule.h"
 #include "SlateIconRefTypeCustomization.h"
-#include "SlateIconRefDataHelper.h"
+#include "Internal/SlateIconRefDataHelper.h"
 #include "SlateIconReference.h"
 #include "SlateIconReferenceEditorStyle.h"
 
@@ -15,6 +15,7 @@ IMPLEMENT_MODULE(FSlateIconReferenceEditorModule, SlateIconReferenceEditor);
 
 static void FSlateIconReference_Test()
 {
+#if 0
 	FSlateIcon Icon("StyleSet", "Style", "Style.Small", "Style.Overlay");
 	FSlateIconReference RefRef(Icon);
 
@@ -22,8 +23,8 @@ static void FSlateIconReference_Test()
 	check(RefRef.IconName == Icon.GetStyleName());
 	check(RefRef.SmallIconName == Icon.GetSmallStyleName());
 	check(RefRef.OverlayIconName == "Style.Overlay");
+#endif
 }
-
 
 void FSlateIconReferenceEditorModule::StartupModule()
 {

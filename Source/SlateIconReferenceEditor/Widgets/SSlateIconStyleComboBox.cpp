@@ -19,6 +19,14 @@ void SSlateIconStyleComboBox::Construct(const FArguments& InArgs)
 
 	PropertyAccess = FSlateIconRefAccessor(InArgs._PropertyHandle);
 
+#if UE_VERSION_OLDER_THAN(5, 0, 0)
+	ForegroundColor = FCoreStyle::Get().GetSlateColor("InvertedForeground");
+	ContentPadding = FMargin(4.0, 2.0);
+#else
+	ForegroundColor = FSlateColor::UseStyle();
+	ContentPadding = FMargin(0);
+#endif
+
 	FSlateIconRefDataHelper::GetDataSource().GatherStyleData(PropertyAccess.AllowClearingValue(), OptionsSource);
 
 	const FComboBoxStyle* ComboStyle = &FStyleHelper::GetWidgetStyle<FComboBoxStyle>("ComboBox");
@@ -28,8 +36,8 @@ void SSlateIconStyleComboBox::Construct(const FArguments& InArgs)
 		.ButtonStyle(&ComboStyle->ComboButtonStyle.ButtonStyle)
 		.HasDownArrow(true)
 		.MenuPlacement(EMenuPlacement::MenuPlacement_BelowAnchor)
-		.ContentPadding(0)
-		.ForegroundColor(FSlateColor::UseStyle())
+		.ContentPadding(ContentPadding)
+		.ForegroundColor(ForegroundColor)
 		.OnMenuOpenChanged(this, &SSlateIconStyleComboBox::OnMenuOpenChanged)
 		.IsFocusable(true)
 		.ButtonContent()
@@ -127,7 +135,7 @@ FSlateColor SSlateIconStyleComboBox::GetSelectedItemColor() const
 	{
 		return FLinearColor::Red;
 	}
-	return FSlateColor::UseStyle();
+	return ForegroundColor;
 }
 
 void SSlateIconStyleComboBox::SetSelectedItem(TSharedPtr<FSlateStyleSetDescriptor> InSelectedItem, ESelectInfo::Type InSelectInfo)
@@ -145,10 +153,18 @@ void SSlateIconStyleComboBox::SetSelectedItem(TSharedPtr<FSlateStyleSetDescripto
 TSharedRef<ITableRow> SSlateIconStyleComboBox::GenerateMenuItemRow(TSharedPtr<FSlateStyleSetDescriptor> InItem, const TSharedRef<STableViewBase>& OwnerTable)
 {
 	auto ComboStyle = &FStyleHelper::Get().GetWidgetStyle<FComboBoxStyle>("ComboBox");
+
+#if !UE_VERSION_OLDER_THAN(5, 0, 0)
 	auto ComboRowStyle = &FStyleHelper::GetWidgetStyle<FTableRowStyle>("ComboBox.Row");
+#else
+	auto ComboRowStyle = &FStyleHelper::GetWidgetStyle<FTableRowStyle>("TableView.Row");
+#endif
+
 	return SNew(SComboRow<TSharedPtr<FSlateStyleSetDescriptor>>, OwnerTable)
 		.Style(ComboRowStyle)
+#if !UE_VERSION_OLDER_THAN(5, 0, 0)
 		.Padding(ComboStyle->MenuRowPadding)
+#endif
 		[
 			SNew(STextBlock)
 				.Text(InItem->GetDisplayText())

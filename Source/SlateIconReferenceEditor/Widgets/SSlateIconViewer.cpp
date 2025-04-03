@@ -4,7 +4,7 @@
 #include "PropertyCustomizationHelpers.h"
 #include "SlateIconReference.h"
 #include "SlateIconRefTypeCustomization.h"
-#include "SlateIconRefDataHelper.h"
+#include "Internal/SlateIconRefDataHelper.h"
 #include "Internal/SlateStyleHelper.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
@@ -27,8 +27,8 @@ namespace Switches
 	//
 	constexpr EMenuPlacement ComboxWithinPopup = MenuPlacement_BelowAnchor;
 
-	// should list contain "none" option
-	constexpr bool bShouldListContainNone = false;
+	// should list contain "none" option if possible
+	constexpr bool bShouldListContainNone = true;
 
 	constexpr bool bWithMenuSection = true;
 	// prefixes filter dropdown
@@ -59,11 +59,7 @@ void SSlateIconViewer::Construct(const FArguments& InArgs)
 		GroupFilter->OnSelectionChanged.BindRaw(this, &SSlateIconViewer::Refresh);
 		GroupFilter->OptionsSource.BindLambda([this](TArray<TSharedPtr<FSlateIconDescriptor>>& OutData)
 		{
-			OutData.Reserve(IconViewerDataSource.Num());
-			for (auto& Ptr : IconViewerDataSource)
-			{
-				OutData.Add(Ptr->IconDescriptor);
-			}
+			OutData.Append(IconViewerDataSource);
 		});
 
 		// set default value for group filter to match current
@@ -126,15 +122,22 @@ void SSlateIconViewer::Construct(const FArguments& InArgs)
 					.ContentPadding(0)
 					.Visibility(Switches::bWithOptions ? EVisibility::Visible : EVisibility::Collapsed)
 					.ForegroundColor(FSlateColor::UseForeground())
+#if UE_VERSION_OLDER_THAN(5, 0, 0)
+					.ButtonStyle(FStyleHelper::Get(), "ToggleButton")
+#else
 					.ComboButtonStyle(FStyleHelper::Get(), "SimpleComboButton")
+#endif
 					.HasDownArrow(false)
 					.OnGetMenuContent(this, &SSlateIconViewer::OptionsCombo_GenerateMenu)
 					.MenuPlacement(Switches::ComboxWithinPopup)
 					.ButtonContent()
 					[
 						SNew(SImage)
+#if !UE_VERSION_OLDER_THAN(5, 0, 0)
 						.Image(FStyleHelper::GetBrush("Icons.Settings"))
-						.ColorAndOpacity(FSlateColor::UseForeground())
+#else
+						.Image(FStyleHelper::GetBrush("PlacementBrowser.OptionsMenu"))
+#endif
 					]
 				]
 			]
@@ -195,34 +198,30 @@ void SSlateIconViewer::Populate()
 		ensure(SelectedStyleSet.IsValid());
 		for (auto& IconDescriptor : SelectedStyleSet->GetRegisteredIcons())
 		{
-			bool bPassFilter = true;
+			bool bPassesFilter = true;
 
 			const FString NameString = IconDescriptor->Name.ToString();
 			if (TextFilter->GetFilterType() != ETextFilterExpressionType::Empty)
-				bPassFilter = TextFilter->TestTextFilter(FBasicStringFilterExpressionContext(NameString));
+				bPassesFilter = TextFilter->TestTextFilter(FBasicStringFilterExpressionContext(NameString));
 			if (GroupFilter.IsValid() && !GroupFilter->TestFilter(*IconDescriptor))
-				bPassFilter = false;
+				bPassesFilter = false;
 			if (DrawTypeFilter.IsValid() && !DrawTypeFilter->TestFilter(*IconDescriptor))
-				bPassFilter = false;
+				bPassesFilter = false;
 			if (ImageTypeFilter.IsValid() && !ImageTypeFilter->TestFilter(*IconDescriptor))
-				bPassFilter = false;
+				bPassesFilter = false;
 
-			auto Item = MakeShared<FViewItem>();
-			Item->IconDescriptor = IconDescriptor;
-			Item->bPassesFilter = bPassFilter;
-			IconViewerDataSource.Add(Item);
+			IconViewerDataSource.Add(IconDescriptor);
 
-			if (Item->bPassesFilter)
+			if (bPassesFilter)
 			{
-				FilteredDataSource.Add(Item);
+				FilteredDataSource.Add(IconDescriptor);
 			}
 		}
 	}
 
 	if (Switches::bShouldListContainNone && !bNoClear)
 	{ // add None option to list
-		auto Item = MakeShared<FViewItem>();
-		Item->IconDescriptor = FSlateIconRefDataHelper::GetDataSource().EmptyImage;
+		auto Item = FSlateIconRefDataHelper::GetDataSource().EmptyImage;
 		IconViewerDataSource.Insert(Item, 0);
 		FilteredDataSource.Insert(Item, 0);
 	}
@@ -288,17 +287,17 @@ FReply SSlateIconViewer::OnFocusReceived(const FGeometry& MyGeometry, const FFoc
 
 TSharedRef<ITableRow> SSlateIconViewer::IconViewerList_GenerateRow(TSharedPtr<SSlateIconViewer::FViewItem> Item, const TSharedRef<STableViewBase>& OwnerTable)
 {
-	ensure(Item->IconDescriptor.IsValid());
+	ensure(Item.IsValid());
 
 	return SNew(SSlateIconViewerRow, OwnerTable)
-		.Descriptor(Item->IconDescriptor)
+		.Descriptor(Item)
 		.HighlightText(SearchBox->GetText())
 		.AssociatedNode(Item);
 }
 
 void SSlateIconViewer::IconViewerList_SelectionChanged(TSharedPtr<SSlateIconViewer::FViewItem> Item, ESelectInfo::Type SelectInfo)
 {
-	OnIconSelected.ExecuteIfBound(Item->IconDescriptor, SelectInfo);
+	OnIconSelected.ExecuteIfBound(Item, SelectInfo);
 }
 
 void SSlateIconViewer::TextFilter_TextChanged(const FText& InFilterText)
@@ -492,21 +491,26 @@ TSharedRef<SWidget> SSlateIconViewer::BuildSelectorWidgetRow(TSharedRef<FIconVie
 		+ SHorizontalBox::Slot()
 		.Padding(2.0f, 2.0f)
 		.AutoWidth()
-		.VAlign(VAlign_Center)
 		[
-			PropertyCustomizationHelpers::MakeResetButton(FSimpleDelegate::CreateLambda([InContext]()
-			{
-				InContext->SelectedValue = InContext->DefaultValue;
-				InContext->OnSelectionChanged.ExecuteIfBound();
+			SNew(SBox)
+			.MinDesiredWidth(20.f)
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			[
+				PropertyCustomizationHelpers::MakeResetButton(FSimpleDelegate::CreateLambda([InContext]()
+				{
+					InContext->SelectedValue = InContext->DefaultValue;
+					InContext->OnSelectionChanged.ExecuteIfBound();
 
-				// if (auto Combobox = InContext->Content.Pin())
-				// {
-				// 	if (Combobox->IsOpen())
-				// 	{
-				// 		Combobox->SetIsOpen(false);
-				// 	}
-				// }
-			}), LOCTEXT("ActionClearGroupFilter", "Reset Filter"))
+					// if (auto Combobox = InContext->Content.Pin())
+					// {
+					// 	if (Combobox->IsOpen())
+					// 	{
+					// 		Combobox->SetIsOpen(false);
+					// 	}
+					// }
+				}), LOCTEXT("ActionClearGroupFilter", "Reset Filter"))
+			]
 		];
 
 	return SelectorRow;

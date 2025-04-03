@@ -22,11 +22,10 @@ class SPropertyEditorSlateIconRef : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS( SPropertyEditorSlateIconRef )
-		: _ThumbnailSize(FIntPoint(48, 48)) {}
+		: _DisplayMode() {}
 		SLATE_ARGUMENT(TSharedPtr<IPropertyHandle>, PropertyHandle)
 		SLATE_ARGUMENT(ESlateIconDisplayMode, DisplayMode)
 		SLATE_ARGUMENT(FName, SinglePropertyDisplay)
-		SLATE_ARGUMENT(FIntPoint, ThumbnailSize)
 	SLATE_END_ARGS()
 
 	SPropertyEditorSlateIconRef();

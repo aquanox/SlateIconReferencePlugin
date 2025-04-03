@@ -8,10 +8,8 @@
 #include "IDetailChildrenBuilder.h"
 #include "MaterialShared.h"
 #include "PropertyCustomizationHelpers.h"
-#include "PropertyEditorClipboard.h"
 #include "PropertyEditorModule.h"
 #include "PropertyHandle.h"
-#include "SlateIconRefDataHelper.h"
 #include "SlateIconReference.h"
 #include "Containers/Array.h"
 #include "Containers/SparseArray.h"
@@ -28,8 +26,17 @@
 #include "Widgets/SSlateIconStyleComboBox.h"
 #include "Internal/SlateIconRefAccessor.h"
 #include "Internal/SlateIconRefDataHelper.h"
+#include "Misc/EngineVersionComparison.h"
+
+#if !UE_VERSION_OLDER_THAN(5, 0, 0)
+#include "PropertyEditorClipboard.h"
+#else
+#include "HAL/PlatformApplicationMisc.h"
+#endif
 
 #define LOCTEXT_NAMESPACE "SlateIconReference"
+
+const FName FSlateIconRefTypeCustomization::TypeName = TEXT("SlateIconReference");
 
 TSharedRef<IPropertyTypeCustomization> FSlateIconRefTypeCustomization::MakeInstance()
 {
@@ -133,7 +140,9 @@ void FSlateIconRefTypeCustomization::CustomizeHeader(TSharedRef<IPropertyHandle>
 	else
 	{
 		InHeaderRow
+#if !UE_VERSION_OLDER_THAN(5, 0, 0)
 		.ShouldAutoExpand(bAutoExpand)
+#endif
 		.AddCustomContextMenuAction(
 			FUIAction(
 				FExecuteAction::CreateRaw(this, &ThisClass::OnReset, FName()),
@@ -257,10 +266,14 @@ void FSlateIconRefTypeCustomization::OnTryGuessSmallImage() const
 	FSlateIconReference Reference;
 	if (Accessor.ReadPropertyValue(Reference))
 	{
-		FSlateIcon AsIcon = Reference.ToSlateIcon();
-		if (AsIcon.GetOptionalIcon() && (Reference.SmallIconName.IsNone() || AsIcon.GetOptionalSmallIcon()))
-		{ // if got a valid icon, guess small icon from it if possible
-			Accessor.SetPropertyIconValue( FSlateIconRefAccessor::Member_SmallIconName(), AsIcon.GetSmallStyleName() );
+		if (Reference.IsSet() && Reference.GetOptionalIcon())
+		{ // if we have a valid primary icon try locate for small icon with matching name
+			Reference.SmallIconName = ISlateStyle::Join(Reference.IconName, ".Small");
+
+			if (Reference.GetOptionalSmallIcon())
+			{ // if got a valid icon set property to it (overriding previous mismatched/bad/empty value)
+				Accessor.SetPropertyIconValue( FSlateIconRefAccessor::Member_SmallIconName(), Reference.SmallIconName );
+			}
 		}
 	}
 }
@@ -289,7 +302,11 @@ void FSlateIconRefTypeCustomization::OnCopyAsBrush(FName InMember) const
 		StaticStruct<FSlateBrush>()->ExportText(Value, Brush, nullptr, nullptr, PPF_Copy, nullptr);
 		if (!Value.IsEmpty())
 		{
+#if !UE_VERSION_OLDER_THAN(5, 0, 0)
 			FPropertyEditorClipboard::ClipboardCopy(*Value);
+#else
+			FPlatformApplicationMisc::ClipboardCopy(*Value);
+#endif
 		}
 	}
 }
@@ -315,10 +332,12 @@ void FSlateIconRefTypeCustomization::OnCopyAsBrushArray() const
 		}
 	}
 
-	Value.InsertAt(0, TEXT("("));
-	Value.Append(TEXT(")"));
 
-	FPropertyEditorClipboard::ClipboardCopy(*Value);
+#if !UE_VERSION_OLDER_THAN(5, 0, 0)
+	FPropertyEditorClipboard::ClipboardCopy(*FString::Printf(TEXT("(%s)"), *Value));
+#else
+	FPlatformApplicationMisc::ClipboardCopy(*FString::Printf(TEXT("(%s)"), *Value));
+#endif
 }
 
 void FSlateIconRefTypeCustomization::OnExportBrushAsset(FName InHandle) const

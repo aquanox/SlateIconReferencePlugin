@@ -6,7 +6,6 @@
 #include "Styling/SlateColor.h"
 #include "Styling/SlateStyle.h"
 #include "Styling/SlateTypes.h"
-#include "Styling/SlateStyleMacros.h"
 
 const FName FSlateIconReferenceEditorStyle::StyleName(TEXT("SlateIconReferenceEditor"));
 
@@ -24,5 +23,4 @@ FSlateIconReferenceEditorStyle::~FSlateIconReferenceEditorStyle()
 
 void FSlateIconReferenceEditorStyle::SetupStyles()
 {
-	SetParentStyleName(TEXT("EditorStyle"));
 }

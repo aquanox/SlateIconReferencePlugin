@@ -48,8 +48,7 @@ void SPropertyEditorSlateIconRef::Construct(const FArguments& InArgs, IPropertyT
 	PropertyAccess = FSlateIconRefAccessor(InArgs._PropertyHandle);
 	DisplayMode = InArgs._DisplayMode;
 
-	bNoClear = PropertyAccess.GetHandle()->HasMetaData("NoClear")
-		|| PropertyAccess.GetHandle()->GetProperty()->HasAnyPropertyFlags(CPF_NoClear);
+	bNoClear = !PropertyAccess.AllowClearingValue();
 
 	FName SinglePropertyDisplay = InArgs._SinglePropertyDisplay;
 	ensure((SinglePropertyDisplay.IsNone() == EnumHasAnyFlags(DisplayMode, ESlateIconDisplayMode::Compact)));
@@ -58,7 +57,7 @@ void SPropertyEditorSlateIconRef::Construct(const FArguments& InArgs, IPropertyT
 	{
 		// initialize the selector
 		IconSelectors.Add(NameToMask.Key,
-			MakeShared<FIconSelector>(NameToMask.Value, InArgs._PropertyHandle, NameToMask.Key));
+		                  MakeShared<FIconSelector>(NameToMask.Value, InArgs._PropertyHandle, NameToMask.Key));
 
 		// in compact mode pick first displayed
 		if (SinglePropertyDisplay.IsNone() && EnumHasAnyFlags(DisplayMode, NameToMask.Value))
@@ -66,6 +65,16 @@ void SPropertyEditorSlateIconRef::Construct(const FArguments& InArgs, IPropertyT
 			SinglePropertyDisplay = NameToMask.Key;
 		}
 	}
+
+#if UE_VERSION_OLDER_THAN(5, 0, 0)
+	const FVector2D DefaultThumbnailSize(48.0f, 48.0f);
+	const FVector2D CompactThumbnailSize(64.0f, 64.0f);
+#else
+	const FVector2D DefaultThumbnailSize(48.0f, 48.0f);
+	const FVector2D CompactThumbnailSize(48.0f, 48.0f);
+#endif
+
+	FVector2D ThumbnailSize = EnumHasAnyFlags(InArgs._DisplayMode, ESlateIconDisplayMode::Compact) ? CompactThumbnailSize : DefaultThumbnailSize;
 
 	TSharedRef<FIconSelector> PreviewTarget = IconSelectors.FindChecked(SinglePropertyDisplay);
 
@@ -80,23 +89,27 @@ void SPropertyEditorSlateIconRef::Construct(const FArguments& InArgs, IPropertyT
 
 	// Build preview image ==================================
 
-	if (EnumHasAnyFlags(InArgs._DisplayMode, ESlateIconDisplayMode::Compact)
-		&& SinglePropertyDisplay != FSlateIconRefAccessor::Member_OverlayIconName())
+	if (EnumHasAnyFlags(InArgs._DisplayMode, ESlateIconDisplayMode::Compact))
 	{
 		// compact mode allows display of icon + overlay in same box
 		SAssignNew(PreviewImage, SLayeredImage)
-			.Image(PreviewTarget, &FIconSelector::GetImageForPreview)
-			.Visibility(EVisibility::SelfHitTestInvisible);
+		.Image(PreviewTarget, &FIconSelector::GetImageForPreview)
+		.Visibility(EVisibility::SelfHitTestInvisible);
 
-		TSharedRef<FIconSelector> OverlayPreviewTarget = IconSelectors.FindChecked(FSlateIconRefAccessor::Member_OverlayIconName());
-		StaticCastSharedPtr<SLayeredImage>(PreviewImage)->AddLayer(TAttribute<const FSlateBrush*>(OverlayPreviewTarget, &FIconSelector::GetImageForPreview));
+		if (EnumHasAnyFlags(InArgs._DisplayMode, ESlateIconDisplayMode::WithOverlayIcon)
+			&& SinglePropertyDisplay != FSlateIconRefAccessor::Member_OverlayIconName())
+		{
+			TSharedRef<FIconSelector> OverlayPreviewTarget = IconSelectors.FindChecked(FSlateIconRefAccessor::Member_OverlayIconName());
+			auto SecondaryLayerAttr = TAttribute<const FSlateBrush*>(OverlayPreviewTarget, &FIconSelector::GetImageForPreview);
+			StaticCastSharedPtr<SLayeredImage>(PreviewImage)->AddLayer(SecondaryLayerAttr);
+		}
 	}
 	else
 	{
 		// standard mode shows just icon for the current property
 		SAssignNew(PreviewImage, SImage)
-			.Image(PreviewTarget, &FIconSelector::GetImageForPreview)
-			.Visibility(EVisibility::SelfHitTestInvisible);
+		.Image(PreviewTarget, &FIconSelector::GetImageForPreview)
+		.Visibility(EVisibility::SelfHitTestInvisible);
 	}
 
 	// Build Selectors section ===================================
@@ -107,8 +120,8 @@ void SPropertyEditorSlateIconRef::Construct(const FArguments& InArgs, IPropertyT
 	if (EnumHasAnyFlags(InArgs._DisplayMode, ESlateIconDisplayMode::Compact))
 	{
 		SelectorsBox->AddSlot()
-		.AutoHeight()
-		.Padding(0, 0, 0, 2)
+		            .AutoHeight()
+		            .Padding(0, 0, 0, 2)
 		[
 			SNew(SSlateIconStyleComboBox).PropertyHandle(PropertyAccess.GetHandle())
 		];
@@ -122,25 +135,29 @@ void SPropertyEditorSlateIconRef::Construct(const FArguments& InArgs, IPropertyT
 			|| EnumHasAllFlags(InArgs._DisplayMode, IconSelector->DesiredMode|ESlateIconDisplayMode::Compact)) // compact mode
 		{
 			SelectorsBox->AddSlot()
-			.AutoHeight()
-			.Padding(0, 0, 0,  2)
+			            .AutoHeight()
+			            .Padding(0, 0, 0,  2)
 			[
 				SAssignNew(IconSelector->ButtonWidget, SComboButton)
-					.ComboButtonStyle(&FStyleHelper::GetWidgetStyle<FComboBoxStyle>("ComboBox").ComboButtonStyle)
-					.ButtonStyle(&FStyleHelper::GetWidgetStyle<FComboBoxStyle>("ComboBox").ComboButtonStyle.ButtonStyle)
+				.ComboButtonStyle(&FStyleHelper::GetWidgetStyle<FComboBoxStyle>("ComboBox").ComboButtonStyle)
+				.ButtonStyle(&FStyleHelper::GetWidgetStyle<FComboBoxStyle>("ComboBox").ComboButtonStyle.ButtonStyle)
+#if UE_VERSION_OLDER_THAN(5, 0, 0)
+				.ContentPadding(FMargin(4.0f, 2.0f))
+#else
 					.ContentPadding(0)
-					.MenuPlacement(EMenuPlacement::MenuPlacement_ComboBox)
-					.OnGetMenuContent(IconSelector, &FIconSelector::GenerateMenu)
-					.OnMenuOpenChanged(IconSelector, &FIconSelector::MenuOpenChanged)
-					.ToolTipText(IconSelector, &FIconSelector::GetTooltipText)
-					.IsEnabled(this, &SPropertyEditorSlateIconRef::CanEdit)
-					.ButtonContent()
-					[
-						SNew(STextBlock)
-							.Font( FStyleHelper::GetFontStyle(  TEXT("PropertyWindow.NormalFont") ) )
-							.ColorAndOpacity(IconSelector, &FIconSelector::GetTextColor)
-							.Text(IconSelector, &FIconSelector::GetText)
-					]
+#endif
+				.MenuPlacement(EMenuPlacement::MenuPlacement_ComboBox)
+				.OnGetMenuContent(IconSelector, &FIconSelector::GenerateMenu)
+				.OnMenuOpenChanged(IconSelector, &FIconSelector::MenuOpenChanged)
+				.ToolTipText(IconSelector, &FIconSelector::GetTooltipText)
+				.IsEnabled(this, &SPropertyEditorSlateIconRef::CanEdit)
+				.ButtonContent()
+				[
+					SNew(STextBlock)
+					.Font( FStyleHelper::GetFontStyle(  TEXT("PropertyWindow.NormalFont") ) )
+					.ColorAndOpacity(IconSelector, &FIconSelector::GetTextColor)
+					.Text(IconSelector, &FIconSelector::GetText)
+				]
 			];
 		}
 	}
@@ -151,18 +168,20 @@ void SPropertyEditorSlateIconRef::Construct(const FArguments& InArgs, IPropertyT
 	if (Switches::bWithButtonsBox && !bNoClear)
 	{
 		ButtonBox->AddSlot()
-			.AutoWidth()
-			.HAlign(HAlign_Center)
-			.VAlign(VAlign_Center)
-			.Padding(0, 0, 2, 0)
-			[
-				PropertyCustomizationHelpers::MakeClearButton(
-					FSimpleDelegate::CreateSP(this, &SPropertyEditorSlateIconRef::OnClear, SinglePropertyDisplay),
-					LOCTEXT( "ActionClear", "Clear"),
-					TAttribute<bool>(this, &SPropertyEditorSlateIconRef::CanEdit)
-				)
-			];
+		         .AutoWidth()
+		         .HAlign(HAlign_Center)
+		         .VAlign(VAlign_Center)
+		         .Padding(0, 0, 2, 0)
+		[
+			PropertyCustomizationHelpers::MakeClearButton(
+				FSimpleDelegate::CreateSP(this, &SPropertyEditorSlateIconRef::OnClear, SinglePropertyDisplay),
+				LOCTEXT( "ActionClear", "Clear"),
+				TAttribute<bool>(this, &SPropertyEditorSlateIconRef::CanEdit)
+			)
+		];
 	}
+
+
 
 	// Build widget content ============================
 
@@ -171,26 +190,35 @@ void SPropertyEditorSlateIconRef::Construct(const FArguments& InArgs, IPropertyT
 		SNew(SHorizontalBox)
 
 		+ SHorizontalBox::Slot()
-		.Padding(0.0f,3.0f,5.0f,3.0f)
+		.Padding(FMargin(3.0f,3.0f,5.0f,3.0f))
 		.AutoWidth()
 		.VAlign(VAlign_Center)
 		[
 			SNew(SBorder)
 			.Visibility(EVisibility::SelfHitTestInvisible)
+
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+#if UE_VERSION_OLDER_THAN(5, 0, 0)
+			.Padding(FMargin(2.0f, 2.0f, 2.0f, 2.0f))
+			.BorderImage(FStyleHelper::GetBrush("AssetThumbnail.ClassBackground"))
+#else
 			.Padding(FMargin(0.0f, 0.0f, 4.0f, 4.0f))
 			.BorderImage(FStyleHelper::GetBrush("PropertyEditor.AssetTileItem.DropShadow"))
+#endif
 			[
 				SNew(SOverlay)
+#if !UE_VERSION_OLDER_THAN(5, 0, 0)
 				+SOverlay::Slot()
-				.Padding(1.0f)
+				.Padding(FMargin(1.0f))
 				[
 					SAssignNew(PreviewBorder, SBorder)
 					.Padding(0)
 					.BorderImage(FStyleDefaults::GetNoBrush())
 					[
 						SNew(SBox)
-						.WidthOverride(static_cast<float>(InArgs._ThumbnailSize.X))
-						.HeightOverride(static_cast<float>(InArgs._ThumbnailSize.Y))
+						.WidthOverride(ThumbnailSize.X)
+						.HeightOverride(ThumbnailSize.Y)
 						[
 							PreviewImage.ToSharedRef()
 						]
@@ -203,20 +231,35 @@ void SPropertyEditorSlateIconRef::Construct(const FArguments& InArgs, IPropertyT
 						.Image(this, &SPropertyEditorSlateIconRef::GetImageForThumbnailBorder)
 						.Visibility(EVisibility::SelfHitTestInvisible)
 				]
-
+#else
+				+ SOverlay::Slot()
+				.Padding(FMargin(1.0f))
+				[
+					SNew(SBorder)
+					.Padding(0)
+					.BorderImage(FEditorStyle::GetBrush("NoBorder"))
+					[
+						SNew(SBox)
+						.WidthOverride(ThumbnailSize.X)
+						.HeightOverride(ThumbnailSize.Y)
+						[
+							PreviewImage.ToSharedRef()
+						]
+					]
+				]
+#endif
 				+SOverlay::Slot()
 				[
 					SNew(SBox)
 					.VAlign(VAlign_Center)
 					.HAlign(HAlign_Center)
-					.Visibility(EVisibility::SelfHitTestInvisible)
 					[
 						SNew(STextBlock)
-							.Text(PreviewTarget, &FIconSelector::GetStatusLabel)
-							.Font(FStyleHelper::GetFontStyle("AssetThumbnail.FontSmall"))
-							.ColorAndOpacity(FStyleHelper::GetSlateColor("AssetThumbnail.ColorAndOpacity"))
-							.Justification(ETextJustify::Center)
-							.Visibility(PreviewTarget, &FIconSelector::GetVisibilityForStatusLabel)
+						.Text(PreviewTarget, &FIconSelector::GetStatusLabel)
+						.Font(FStyleHelper::GetFontStyle("AssetThumbnail.FontSmall"))
+						.ColorAndOpacity(FStyleHelper::GetSlateColor("AssetThumbnail.ColorAndOpacity"))
+						.Justification(ETextJustify::Center)
+						.Visibility(PreviewTarget, &FIconSelector::GetVisibilityForStatusLabel)
 					]
 				]
 			]

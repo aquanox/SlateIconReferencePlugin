@@ -16,7 +16,7 @@ class FSlateIconRefTypeCustomization : public IPropertyTypeCustomization
 {
 	using ThisClass = FSlateIconRefTypeCustomization;
 public:
-	inline static const FName TypeName = "SlateIconReference";
+	static const FName TypeName;
 
 	static TSharedRef<IPropertyTypeCustomization> MakeInstance();
 	virtual ~FSlateIconRefTypeCustomization();

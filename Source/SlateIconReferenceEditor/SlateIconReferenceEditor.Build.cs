@@ -22,21 +22,31 @@ public class SlateIconReferenceEditor : ModuleRules
 
         PublicDependencyModuleNames.AddRange(new string[] {
             "Core",
-            "CoreUObject",
-            "Slate",
             "SlateCore",
             "SlateIconReference"
         });
 
         PrivateDependencyModuleNames.AddRange(new string[] {
+	        "CoreUObject",
+	        "Slate",
             "Engine",
             "PropertyEditor",
             "DeveloperSettings",
             "EditorStyle",
             "EditorWidgets",
             "InputCore",
-            "ToolWidgets"
+            "ApplicationCore"
         });
+
+        if (Target.Version.MajorVersion == 4 && CppStandard < CppStandardVersion.Cpp17)
+        { // required for private access in 4.27
+	        CppStandard = CppStandardVersion.Cpp17;
+        }
+
+        if (Target.Version.MajorVersion >= 5)
+        {
+            PrivateDependencyModuleNames.Add("ToolWidgets");
+        }
     }
 
 

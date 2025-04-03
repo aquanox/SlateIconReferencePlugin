@@ -7,6 +7,7 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
+#include "Misc/EngineVersionComparison.h"
 
 #define LOCTEXT_NAMESPACE "SlateIconReference"
 
@@ -105,6 +106,7 @@ void SSlateIconViewerRowTooltip::BuildInfo(const FSlateIconDescriptor& Desc, con
 
 		{
 			FVector2D ImageSize = Brush->GetImageSize();
+#if !UE_VERSION_OLDER_THAN(5, 0, 0)
 			if (ImageSize.IsZero() && Brush->GetDrawType() != ESlateBrushImageType::Vector)
 			{
 				auto& Resource = Brush->GetRenderingResource();
@@ -113,7 +115,7 @@ void SSlateIconViewerRowTooltip::BuildInfo(const FSlateIconDescriptor& Desc, con
 					ImageSize = Brush->GetRenderingResource().GetResourceProxy()->ActualSize;
 				}
 			}
-
+#endif
 			TStringBuilder<64> Builder;
 			Builder.Appendf(TEXT("%.2f x %.2f"), ImageSize.X, ImageSize.Y);
 			AddToToolTipInfoBox(InfoBox, LOCTEXT("ImageTooltipImageSize","Image Size"), FText::FromString(Builder.ToString()));

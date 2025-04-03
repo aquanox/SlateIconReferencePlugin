@@ -25,6 +25,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Internal/SlateIconRefDataHelper.h"
 #include "PropertyHandle.h"
+#include "Misc/EngineVersionComparison.h"
 
 #define LOCTEXT_NAMESPACE "SlateIconReference"
 
@@ -35,30 +36,40 @@ void SSlateIconStaticPreview::Construct(const FArguments& InArgs)
 	MaxWidth = InArgs._MaxWidth;
 	AutoRefresh = InArgs._AutoRefresh;
 
-	TSharedRef<SWidget> ImageWidget = SNullWidget::NullWidget;
-
+	bool bLayered = false;
 	if (InArgs._SourceDescriptor)
 	{
 		UpdateVisualsFunc.BindRaw(this, &SSlateIconStaticPreview::UpdateVisuals, InArgs._SourceDescriptor);
-
-		ImageWidget = SNew(SImage)
-			.Visibility(this, &SSlateIconStaticPreview::GetVisibilityForPreviewImage)
-			.Image(this, &SSlateIconStaticPreview::GetPropertyBrush);
 	}
-	else if (InArgs._SourceProperty)
+	else
 	{
 		UpdateVisualsFunc.BindRaw(this, &SSlateIconStaticPreview::UpdateVisuals, InArgs._SourceProperty);
-
-		auto Widget = SNew(SLayeredImage)
-			.Visibility(this, &SSlateIconStaticPreview::GetVisibilityForPreviewImage)
-			.Image(this, &SSlateIconStaticPreview::GetPropertyBrush);
-
-		Widget->AddLayer(TAttribute<const FSlateBrush*>(this, &SSlateIconStaticPreview::GetPropertyOverlayBrush));
-
-		ImageWidget = Widget;
+		bLayered = true;
 	}
 
 	UpdateVisualsFunc.ExecuteIfBound();
+
+	if (!bLayered)
+	{
+		auto ImageWidget = SNew(SImage)
+			.Visibility(this, &SSlateIconStaticPreview::GetVisibilityForPreviewImage)
+			.Image(this, &SSlateIconStaticPreview::GetPropertyBrush);
+
+		Image = ImageWidget;
+	}
+	else
+	{
+		auto OverlayBrushAttribute = TAttribute<const FSlateBrush*>(this, &SSlateIconStaticPreview::GetPropertyOverlayBrush);
+		auto ColorAttribute = TAttribute<FSlateColor>(FLinearColor::White);
+
+		auto ImageWidget = SNew(SLayeredImage, OverlayBrushAttribute, ColorAttribute)
+			.Visibility(this, &SSlateIconStaticPreview::GetVisibilityForPreviewImage)
+			.Image(this, &SSlateIconStaticPreview::GetPropertyBrush);
+
+		Image = ImageWidget;
+	}
+
+
 
 	ChildSlot
 	[
@@ -83,7 +94,7 @@ void SSlateIconStaticPreview::Construct(const FArguments& InArgs)
 			.WidthOverride(this, &SSlateIconStaticPreview::GetScaledImageBrushWidth)
 			.HeightOverride(this, &SSlateIconStaticPreview::GetScaledImageBrushHeight)
 			[
-				ImageWidget
+				Image.ToSharedRef()
 			]
 		]
 	];

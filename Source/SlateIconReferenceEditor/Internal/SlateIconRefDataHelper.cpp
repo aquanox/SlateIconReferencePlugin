@@ -187,7 +187,7 @@ const FSlateBrush* FSlateIconDescriptor::GetBrushSafe() const
 		const ISlateStyle* StyleSet = FSlateStyleRegistry::FindSlateStyle(StyleSetName);
 		if (StyleSet)
 		{
-			if (const FSlateBrush* Result = StyleSet->GetBrush(Name, nullptr, nullptr))
+			if (const FSlateBrush* Result = StyleSet->GetBrush(Name))
 			{
 				return Result;
 			}
@@ -203,7 +203,7 @@ const FSlateBrush* FSlateIconDescriptor::GetBrush() const
 		const ISlateStyle* StyleSet = FSlateStyleRegistry::FindSlateStyle(StyleSetName);
 		if (StyleSet)
 		{
-			return StyleSet->GetBrush(Name, nullptr, nullptr);
+			return StyleSet->GetBrush(Name);
 		}
 	}
 	return nullptr;

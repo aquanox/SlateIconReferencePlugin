@@ -50,6 +50,8 @@ public:
 private:
 
 	FSlateIconRefAccessor PropertyAccess;
+	FSlateColor ForegroundColor;
+	FMargin ContentPadding;
 
 	TArray< TSharedPtr<FSlateStyleSetDescriptor> > OptionsSource;
 	TArray< TSharedPtr<FSlateStyleSetDescriptor> > FilteredOptionsSource;

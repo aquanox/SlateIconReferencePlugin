@@ -11,7 +11,7 @@
 #include "HAL/PreprocessorHelpers.h"
 #include "Templates/Identity.h"
 
-namespace UE::Core::Private
+namespace UE_Core_Private
 {
 	template <auto Storage, auto PtrToMember>
 	struct TPrivateAccess
@@ -28,8 +28,8 @@ namespace UE::Core::Private
 	TPrivateAccess<Storage, PtrToMember> TPrivateAccess<Storage, PtrToMember>::Instance;
 }
 
-#define UE_DEFINE_PRIVATE_MEMBER_PTR(Type, Name, Class, Member) \
-	TIdentity_T<PREPROCESSOR_REMOVE_OPTIONAL_PARENS(Type)> PREPROCESSOR_REMOVE_OPTIONAL_PARENS(Class)::* Name; \
-	template struct UE::Core::Private::TPrivateAccess<&Name, &PREPROCESSOR_REMOVE_OPTIONAL_PARENS(Class)::Member>
+#define UE_DEFINE_PRIVATE_MEMBER_PTR(InType, Name, Class, Member) \
+	TIdentity<PREPROCESSOR_REMOVE_OPTIONAL_PARENS(InType)>::Type PREPROCESSOR_REMOVE_OPTIONAL_PARENS(Class)::* Name; \
+	template struct UE_Core_Private::TPrivateAccess<&Name, &PREPROCESSOR_REMOVE_OPTIONAL_PARENS(Class)::Member>
 
 #endif
