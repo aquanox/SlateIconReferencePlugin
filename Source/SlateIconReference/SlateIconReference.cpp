@@ -12,6 +12,30 @@
 
 IMPLEMENT_MODULE(FDefaultModuleImpl, SlateIconReference);
 
+#if !UE_VERSION_OLDER_THAN(5, 5, 0)
+// Use engine private access
+#include "Misc/DefinePrivateMemberPtr.h"
+UE_DEFINE_PRIVATE_MEMBER_PTR(FName, GOverlayIconName, FSlateIcon, StatusOverlayStyleName);
+
+static FName Internal_ReadOverlayFromIcon(const FSlateIcon& InIcon)
+{
+	return InIcon.*GOverlayIconName;
+}
+
+#elif !UE_VERSION_OLDER_THAN(5, 0, 0)
+// Use memory layout matching
+static FName Internal_ReadOverlayFromIcon(const FSlateIcon& InIcon)
+{
+	struct FIconAccessor { FName StyleSet, Icon, SmallIcon, OverlayIcon; };
+	static_assert(sizeof(FIconAccessor) == sizeof(FSlateIcon), "FIconAccessor does not match FSlateIcon layout");
+	return reinterpret_cast<const FIconAccessor*>(&InIcon)->OverlayIcon;
+}
+
+#else
+// UE4 has no such property, leave it none
+static FName Internal_ReadOverlayFromIcon(const FSlateIcon& InIcon) { return FName(); }
+#endif
+
 FSlateIconReference::FSlateIconReference(const FName& InStyleSetName)
 	: StyleSetName(InStyleSetName)
 {
@@ -33,14 +57,8 @@ FSlateIconReference& FSlateIconReference::operator=(const FSlateIcon& Other)
 	StyleSetName = Other.GetStyleSetName();
 	IconName = Other.GetStyleName();
 	SmallIconName = Other.GetSmallStyleName();
-
-	//there is no getter, but in memory layout it is next after small icon
-	// so um ... try this instead of making dependency on private_access
-	const uint8* pStyle = reinterpret_cast<const uint8*>(&Other.GetStyleName());
-	const uint8* pSmall = reinterpret_cast<const uint8*>(&Other.GetSmallStyleName());
-	const uint8* pOverlay = pSmall + ( reinterpret_cast<intptr_t>(pSmall) - reinterpret_cast<intptr_t>(pStyle) );
-	OverlayIconName = * reinterpret_cast<const FName*>(pOverlay);
-
+	// do some magic as engine did not expose accessor for 4th member
+	OverlayIconName = Internal_ReadOverlayFromIcon(Other);
 	return *this;
 }
 

@@ -13,23 +13,8 @@
 
 IMPLEMENT_MODULE(FSlateIconReferenceEditorModule, SlateIconReferenceEditor);
 
-static void FSlateIconReference_Test()
-{
-#if 0
-	FSlateIcon Icon("StyleSet", "Style", "Style.Small", "Style.Overlay");
-	FSlateIconReference RefRef(Icon);
-
-	check(RefRef.StyleSetName == Icon.GetStyleSetName());
-	check(RefRef.IconName == Icon.GetStyleName());
-	check(RefRef.SmallIconName == Icon.GetSmallStyleName());
-	check(RefRef.OverlayIconName == "Style.Overlay");
-#endif
-}
-
 void FSlateIconReferenceEditorModule::StartupModule()
 {
-	FSlateIconReference_Test();
-
 	if (GIsEditor && !IsRunningCommandlet())
 	{
 		StyleSet = MakeShared<FSlateIconReferenceEditorStyle>();
