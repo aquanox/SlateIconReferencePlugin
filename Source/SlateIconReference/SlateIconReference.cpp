@@ -36,12 +36,6 @@ static FName Internal_ReadOverlayFromIcon(const FSlateIcon& InIcon)
 static FName Internal_ReadOverlayFromIcon(const FSlateIcon& InIcon) { return FName(); }
 #endif
 
-FSlateIconReference::FSlateIconReference(const FName& InStyleSetName)
-	: StyleSetName(InStyleSetName)
-{
-
-}
-
 FSlateIconReference::FSlateIconReference(const FSlateIcon& InIcon)
 {
 	operator=(InIcon);
@@ -84,6 +78,11 @@ const FSlateBrush* FSlateIconReference::GetIcon() const
 const FSlateBrush* FSlateIconReference::GetOptionalIcon() const
 {
 	return ToSlateIcon().GetOptionalIcon();
+}
+
+const FSlateBrush* FSlateIconReference::GetSmallIcon() const
+{
+	return ToSlateIcon().GetSmallIcon();
 }
 
 const FSlateBrush* FSlateIconReference::GetOptionalSmallIcon() const

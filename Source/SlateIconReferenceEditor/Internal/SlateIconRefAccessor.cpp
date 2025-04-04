@@ -116,7 +116,7 @@ void FSlateIconRefAccessor::SetPropertyStyleSetValue(const FName& ValueToSet) co
 		auto* Pre = static_cast<FSlateIconReference*>(Data);
 		if (Pre->StyleSetName != ValueToSet)
 		{ // reset rest
-			*Pre = FSlateIconReference(ValueToSet);
+			*Pre = FSlateIconReference(ValueToSet, NAME_None, NAME_None);
 
 			PropertyHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
 			PropertyHandle->NotifyFinishedChangingProperties();
