@@ -22,7 +22,7 @@ struct FSlateIconDescriptor
 	FName				StyleSetName;
 	FName				Name;
 	TOptional<FText>	DisplayTextOverride;
-	bool				bUnknown = false;
+	bool				bUnknown = false; // is known image
 
 	const FName& GetID() const { return Name; }
 	// null-safe getbrush
@@ -44,9 +44,11 @@ struct FSlateIconDescriptor
 struct FSlateStyleSetDescriptor
 {
 	FName				Name;
+	FName				ParentStyleName;
 	TOptional<FText>	DisplayTextOverride;
+	// is this descriptor for an unknown (not registered anywhere) style set
 	bool				bUnknown = false;
-
+	// icons registered within this particular style set
 	TArray<TSharedPtr<FSlateIconDescriptor>> Icons;
 
 	const FName& GetID() const { return Name; }
@@ -76,10 +78,10 @@ public:
 	void ForceRescan() { bInitialized = false; }
 
 	void GatherStyleData(bool bAllowNone, TArray<TSharedPtr<FSlateStyleSetDescriptor>>& OutArray);
-	void GatherIconData(bool bAllowNone, TArray<TSharedPtr<FSlateIconDescriptor>>& OutArray);
+	void GatherIconData(bool bAllowNone, FName StyleSetName, bool bRecursive, TArray<TSharedPtr<FSlateIconDescriptor>>& OutArray);
 
-	TSharedPtr<FSlateStyleSetDescriptor> FindStyleSet(FName StyleSetName);
-	TSharedPtr<FSlateIconDescriptor> FindIcon(FName StyleSetName, FName IconName);
+	TSharedPtr<FSlateStyleSetDescriptor> FindStyleSet(FName StyleSetName, bool bMakeUnknown = true);
+	TSharedPtr<FSlateIconDescriptor> FindIcon(FName StyleSetName, FName IconName, bool bMakeUnknown = true);
 
 	TArray<TSharedPtr<FSlateStyleSetDescriptor>> const& GetStyleSets() const { return KnownStyleSets; }
 
@@ -94,8 +96,6 @@ public:
 	TOptional<TArray<FName>> IgnoredStyleSets;
 	// all discovered stylesets
 	TArray<TSharedPtr<FSlateStyleSetDescriptor>> KnownStyleSets;
-	// all discovered icons
-	TArray<TSharedPtr<FSlateIconDescriptor>> KnownIcons;
 	// searchable icon map
 	using FImageKey = TPair<FName, FName>;
 	TMap<FImageKey, TSharedPtr<FSlateIconDescriptor>> KnownIconsMap;

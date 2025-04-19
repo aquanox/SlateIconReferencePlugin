@@ -203,7 +203,7 @@ void SPropertyEditorSlateIconRef::Construct(const FArguments& InArgs, IPropertyT
 			.Padding(FMargin(2.0f, 2.0f, 2.0f, 2.0f))
 			.BorderImage(FStyleHelper::GetBrush("AssetThumbnail.ClassBackground"))
 #else
-			.Padding(FMargin(0.0f, 0.0f, 4.0f, 4.0f))
+			.Padding(FMargin(2.0f, 2.0f, 2.0f, 2.0f))
 			.BorderImage(FStyleHelper::GetBrush("PropertyEditor.AssetTileItem.DropShadow"))
 #endif
 			[

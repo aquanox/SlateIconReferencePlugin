@@ -11,12 +11,43 @@
 #include "Styling/SlateStyleRegistry.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/SToolTip.h"
+#include "Algo/Transform.h"
 
 #define LOCTEXT_NAMESPACE "SlateIconReference"
 
 using FBrushResourcesMap = TMap<FName, FSlateBrush*>;
 UE_DEFINE_PRIVATE_MEMBER_PTR(FBrushResourcesMap, GBrushResources, FSlateStyleSet, BrushResources);
+// using FDynamicBrushResourceMap =  TMap< FName, TWeakPtr< FSlateDynamicImageBrush > >;
+// UE_DEFINE_PRIVATE_MEMBER_PTR(FDynamicBrushResourceMap, GDynamicBrushResources, FSlateStyleSet, DynamicBrushes);
 UE_DEFINE_PRIVATE_MEMBER_PTR(FSlateBrush*, GDefaultBrush, FSlateStyleSet, DefaultBrush);
+
+#if !UE_VERSION_OLDER_THAN(5,0,0)
+UE_DEFINE_PRIVATE_MEMBER_PTR(FName, GParentStyleName, FSlateStyleSet, ParentStyleName);
+#endif
+
+struct FDescriptorFinder
+{
+	const FName Key;
+	FDescriptorFinder(const FName& Key) : Key(Key) { }
+
+	bool operator== (const FSlateStyleSetDescriptor& A) const { return A.Name == Key; }
+	bool operator== (const TSharedPtr<FSlateStyleSetDescriptor>& A) const { return A->Name == Key; }
+	bool operator== (const FSlateIconDescriptor& A) const { return A.Name == Key; }
+	bool operator== (const TSharedPtr<FSlateIconDescriptor>& A) const { return A->Name == Key; }
+};
+
+struct FDescriptorSorters
+{
+	bool operator() (const TSharedPtr<FSlateStyleSetDescriptor>& A, const TSharedPtr<FSlateStyleSetDescriptor>& B) const
+	{
+		return A->Name.ToString() < B->Name.ToString();
+	}
+	
+	bool operator() (const TSharedPtr<FSlateIconDescriptor>& A, const TSharedPtr<FSlateIconDescriptor>& B) const
+	{
+		return A->Name.ToString() < B->Name.ToString();
+	}
+};
 
 static TSharedPtr<FSlateIconRefDataHelper> GDataSource;
 FSlateIconRefDataHelper& FSlateIconRefDataHelper::GetDataSource()
@@ -69,7 +100,6 @@ void FSlateIconRefDataHelper::SetupStyleData()
 	}
 
 	KnownStyleSets.Empty();
-	KnownIcons.Empty();
 	KnownIconsMap.Empty();
 
 	FSlateStyleRegistry::IterateAllStyles([this](const ISlateStyle& Style)
@@ -80,60 +110,53 @@ void FSlateIconRefDataHelper::SetupStyleData()
 
 		UE_LOG(LogSlateIcon, Verbose, TEXT("Found style: %s"), *StyleName.ToString());
 
+		const FSlateStyleSet& SlateStyleSet = static_cast<const FSlateStyleSet&>(Style);
+
 		auto StyleRef = MakeShared<FSlateStyleSetDescriptor>();
 		StyleRef->Name = StyleName;
-		//StyleRef->Style = &Style;
+#if !UE_VERSION_OLDER_THAN(5,0,0)
+		StyleRef->ParentStyleName = SlateStyleSet.*GParentStyleName;
+#endif
 		KnownStyleSets.Add(StyleRef);
 
-		const FBrushResourcesMap& Map = static_cast<const FSlateStyleSet&>(Style).*GBrushResources;
-
-		for (const TTuple<FName, FSlateBrush*>& Tuple : Map)
+		const FBrushResourcesMap& BrushResourcesMap = SlateStyleSet.*GBrushResources;
+		for (const auto& KeyToBrush : BrushResourcesMap)
 		{
-			if (Tuple.Key.IsNone() || !Tuple.Value)
-				continue;
+			if (!KeyToBrush.Key.IsNone() && KeyToBrush.Value)
+			{
+				UE_LOG(LogSlateIcon, Verbose, TEXT("Found item: %s.%s"), *StyleName.ToString(), *KeyToBrush.Key.ToString());
 
-			UE_LOG(LogSlateIcon, Verbose, TEXT("Found item: %s.%s"), *StyleName.ToString(), *Tuple.Key.ToString());
-
-			auto IconRef = MakeShared<FSlateIconDescriptor>();
-			IconRef->StyleSetName = StyleName;
-			IconRef->Name = Tuple.Key;
-			//IconRef->Brush = Tuple.Value;
-
-			KnownIcons.Add(IconRef);
-			KnownIconsMap.Add(MakeTuple(StyleName, Tuple.Key), IconRef);
-
-			StyleRef->Icons.Add(IconRef);
+				auto IconRef = MakeShared<FSlateIconDescriptor>();
+				IconRef->StyleSetName = StyleName;
+				IconRef->Name = KeyToBrush.Key;
+				StyleRef->Icons.Add(IconRef);
+			}
 		}
 
-		Algo::Sort(StyleRef->Icons, [](const TSharedPtr<FSlateIconDescriptor>& A, const TSharedPtr<FSlateIconDescriptor>& B)
-		{
-			return A->Name.ToString() < B->Name.ToString();
-		});
+		Algo::Sort(StyleRef->Icons, FDescriptorSorters());
 
 		return true;
 	});
 
-	Algo::Sort(KnownStyleSets, [](const TSharedPtr<FSlateStyleSetDescriptor>& A, const TSharedPtr<FSlateStyleSetDescriptor>& B)
+	Algo::Sort(KnownStyleSets, FDescriptorSorters());
+
+	TArray<TSharedPtr<FSlateIconDescriptor>> Temp; 
+	for (TSharedPtr<FSlateStyleSetDescriptor>& Descriptor : KnownStyleSets)
 	{
-		return A->Name.ToString() < B->Name.ToString();
-	});
-	// sort all icons by category and name
-	Algo::Sort(KnownIcons, [](const TSharedPtr<FSlateIconDescriptor>& A, const TSharedPtr<FSlateIconDescriptor>& B)
-	{
-		if (A->StyleSetName != B->StyleSetName)
+		Temp.Empty();
+		GatherIconData(false, Descriptor->Name, true, Temp);
+
+		for (const TSharedPtr<FSlateIconDescriptor>& Icon : Temp)
 		{
-			return A->StyleSetName.ToString() < B->StyleSetName.ToString();
+			KnownIconsMap.Add(MakeTuple(Descriptor->Name, Icon->Name), Icon);
 		}
-		return A->Name.ToString() < B->Name.ToString();
-	});
+	}
 }
 
 void FSlateIconRefDataHelper::ClearStyleData()
 {
-	bInitialized = true;
 	KnownIconsMap.Empty();
 	KnownStyleSets.Empty();
-	KnownIcons.Empty();
 }
 
 void FSlateIconRefDataHelper::GatherStyleData(bool bAllowNone, TArray<TSharedPtr<FSlateStyleSetDescriptor>>& OutArray)
@@ -145,49 +168,91 @@ void FSlateIconRefDataHelper::GatherStyleData(bool bAllowNone, TArray<TSharedPtr
 	OutArray.Append(KnownStyleSets);
 }
 
-void FSlateIconRefDataHelper::GatherIconData(bool bAllowNone, TArray<TSharedPtr<FSlateIconDescriptor>>& OutArray)
+void FSlateIconRefDataHelper::GatherIconData(bool bAllowNone, FName StyleSetName, bool bRecursive, TArray<TSharedPtr<FSlateIconDescriptor>>& OutArray)
 {
+	if (StyleSetName.IsNone())
+		return;
+
 	if (bAllowNone)
-	{
 		OutArray.Add(EmptyImage);
+
+	if (!bRecursive)
+	{
+		OutArray.Append(FindStyleSet(StyleSetName, false)->GetRegisteredIcons());
 	}
-	OutArray.Append(KnownIcons);
+	else
+	{
+		while (!StyleSetName.IsNone())
+		{
+			TSharedPtr<FSlateStyleSetDescriptor> Descriptor = FindStyleSet(StyleSetName, false);
+			ensure(Descriptor.IsValid());
+			OutArray.Append(Descriptor->GetRegisteredIcons());
+			StyleSetName = Descriptor->ParentStyleName;
+		}
+
+		Algo::Sort(OutArray, FDescriptorSorters());
+	}
 }
 
-TSharedPtr<FSlateStyleSetDescriptor> FSlateIconRefDataHelper::FindStyleSet(FName StyleSetName)
+TSharedPtr<FSlateStyleSetDescriptor> FSlateIconRefDataHelper::FindStyleSet(FName StyleSetName, bool bMakeUnknown)
 {
 	if (StyleSetName.IsNone())
 	{
 		return EmptyStyleSet;
 	}
 
-	if (auto Found = KnownStyleSets.FindByPredicate([&](const TSharedPtr<FSlateStyleSetDescriptor>& Ref) { return Ref->Name == StyleSetName; }))
+	if (auto* Found = KnownStyleSets.FindByKey<FDescriptorFinder>(StyleSetName))
 	{
 		return *Found;
 	}
 
-	TSharedPtr<FSlateStyleSetDescriptor> Unknown = MakeShared<FSlateStyleSetDescriptor>();
-	Unknown->Name = StyleSetName;
-	Unknown->bUnknown = true;
-	return Unknown;
+	if (bMakeUnknown)
+	{
+		TSharedPtr<FSlateStyleSetDescriptor> Unknown = MakeShared<FSlateStyleSetDescriptor>();
+		Unknown->Name = StyleSetName;
+		Unknown->bUnknown = true;
+		return Unknown;
+	}
+
+	return EmptyStyleSet;
 }
 
-TSharedPtr<FSlateIconDescriptor> FSlateIconRefDataHelper::FindIcon(FName StyleSetName, FName IconName)
+TSharedPtr<FSlateIconDescriptor> FSlateIconRefDataHelper::FindIcon(FName StyleSetName, FName IconName, bool bMakeUnknown)
 {
 	if (StyleSetName.IsNone() || IconName.IsNone())
 	{
 		return EmptyImage;
 	}
-	if (auto* Found = KnownIconsMap.Find(MakeTuple(StyleSetName, IconName)))
+
+	if (auto* QuickLookup = KnownIconsMap.Find(MakeTuple(StyleSetName, IconName)))
 	{
-		return *Found;
+		return *QuickLookup;
 	}
 
-	TSharedPtr<FSlateIconDescriptor> Unknown = MakeShared<FSlateIconDescriptor>();
-	Unknown->StyleSetName = StyleSetName;
-	Unknown->Name = IconName;
-	Unknown->bUnknown = true;
-	return Unknown;
+	if (auto* StyleSet = KnownStyleSets.FindByKey<FDescriptorFinder>(StyleSetName))
+	{
+		if (auto* Icon = (*StyleSet)->Icons.FindByKey<FDescriptorFinder>(IconName))
+		{
+			return *Icon;
+		}
+
+		const FName ParentStyleName = (*StyleSet)->ParentStyleName;
+		if (!ParentStyleName.IsNone())
+		{
+			return FindIcon(ParentStyleName, IconName, bMakeUnknown);
+		}
+	}
+
+	if (bMakeUnknown)
+	{
+		TSharedPtr<FSlateIconDescriptor> Unknown = MakeShared<FSlateIconDescriptor>();
+		Unknown->StyleSetName = StyleSetName;
+		Unknown->Name = IconName;
+		Unknown->bUnknown = true;
+		return Unknown;
+	}
+
+	return EmptyImage;
 }
 
 // =============================================================

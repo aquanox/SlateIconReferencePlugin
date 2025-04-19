@@ -70,6 +70,8 @@ public:
 	TSharedRef<SWidget> OptionsCombo_GenerateMenu();
 	void OptionsCombo_GenerateDrawTypeMenu(FMenuBuilder&);
 	void OptionsCombo_GenerateImageTypeSubmenu(FMenuBuilder&);
+	void OptionsCombo_ToggleInherited();
+	bool OptionsCombo_ToggleInheritedChecked() const { return bShowInheritedFilter; }
 	// }
 
 	// { menu - list
@@ -105,6 +107,7 @@ private:
 	TSharedPtr<FIconViewerFilter> GroupFilter;
 	TSharedPtr<FIconViewerFilter> DrawTypeFilter;
 	TSharedPtr<FIconViewerFilter> ImageTypeFilter;
+	static bool					  bShowInheritedFilter;
 	// }
 
 	// { menu - search
@@ -114,7 +117,8 @@ private:
 
 	// { menu - icon listview
 	TSharedPtr<SListView<TSharedPtr<FViewItem>>> IconViewerList;
-	TArray<TSharedPtr<FViewItem>> IconViewerDataSource;
+	FName LastUsedStyleSet = NAME_None;
+	TArray<TSharedPtr<FViewItem>> IconsDataSource;
 	TArray<TSharedPtr<FViewItem>> FilteredDataSource;
 	// }
 };

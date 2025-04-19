@@ -19,6 +19,8 @@ void FSlateIconReferenceEditorModule::StartupModule()
 	{
 		StyleSet = MakeShared<FSlateIconReferenceEditorStyle>();
 
+		FModuleManager::Get().OnModulesChanged().AddRaw(this, &FSlateIconReferenceEditorModule::HandleModulesChanged);
+
 		FPropertyEditorModule& PropertyEditor = FModuleManager::Get().GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 		PropertyEditor.RegisterCustomPropertyTypeLayout(FSlateIconRefTypeCustomization::TypeName,
 			FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSlateIconRefTypeCustomization::MakeInstance)
@@ -32,12 +34,33 @@ void FSlateIconReferenceEditorModule::ShutdownModule()
 	{
 		StyleSet.Reset();
 
+		FModuleManager::Get().OnModulesChanged().RemoveAll(this);
+		
 		FSlateIconRefDataHelper::GetDataSource().ClearStyleData();
 
 		if (FModuleManager::Get().IsModuleLoaded("PropertyEditor") )
 		{
 			FPropertyEditorModule& PropertyEditor = FModuleManager::Get().GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 			PropertyEditor.UnregisterCustomPropertyTypeLayout(FSlateIconRefTypeCustomization::TypeName);
+		}
+	}
+}
+
+void FSlateIconReferenceEditorModule::HandleModulesChanged(FName Name, EModuleChangeReason ModuleChangeReason)
+{
+	if (GIsEditor && !IsRunningCommandlet())
+	{
+		switch(ModuleChangeReason)
+		{
+		case EModuleChangeReason::ModuleLoaded:
+		case EModuleChangeReason::ModuleUnloaded:
+			// clear known style data in order to re-initialize later
+			FSlateIconRefDataHelper::GetDataSource().ForceRescan();
+			FSlateIconRefDataHelper::GetDataSource().ClearStyleData();
+			break;
+		default:
+		case EModuleChangeReason::PluginDirectoryChanged:
+			break;
 		}
 	}
 }

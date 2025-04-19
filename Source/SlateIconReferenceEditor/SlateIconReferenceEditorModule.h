@@ -12,6 +12,8 @@ class FSlateIconReferenceEditorModule : public IModuleInterface
 public:
     virtual void StartupModule() override;
     virtual void ShutdownModule() override;
+
+    void HandleModulesChanged(FName Name, EModuleChangeReason ModuleChangeReason);
 private:
     TSharedPtr<FSlateIconReferenceEditorStyle> StyleSet;
 };

@@ -22,6 +22,8 @@
 
 TSharedRef<SWidget> SearchSlateWidget( TSharedRef<SWidget> Content, const FName& InType );
 
+bool SSlateIconViewer::bShowInheritedFilter = false;
+
 namespace Switches
 {
 	//
@@ -59,7 +61,7 @@ void SSlateIconViewer::Construct(const FArguments& InArgs)
 		GroupFilter->OnSelectionChanged.BindRaw(this, &SSlateIconViewer::Refresh);
 		GroupFilter->OptionsSource.BindLambda([this](TArray<TSharedPtr<FSlateIconDescriptor>>& OutData)
 		{
-			OutData.Append(IconViewerDataSource);
+			OutData.Append(IconsDataSource);
 		});
 
 		// set default value for group filter to match current
@@ -188,42 +190,40 @@ void SSlateIconViewer::Construct(const FArguments& InArgs)
 
 void SSlateIconViewer::Populate()
 {
-	IconViewerDataSource.Empty();
-	FilteredDataSource.Empty();
-
 	FName StyleSetName;
-	if (ReadPropertyValue(&StyleSetName))
+	ReadPropertyValue(&StyleSetName);
+
+	if (LastUsedStyleSet != StyleSetName)
 	{
-		auto SelectedStyleSet = FSlateIconRefDataHelper::GetDataSource().FindStyleSet(StyleSetName);
-		ensure(SelectedStyleSet.IsValid());
-		for (auto& IconDescriptor : SelectedStyleSet->GetRegisteredIcons())
-		{
-			bool bPassesFilter = true;
+		IconsDataSource.Empty();
+		LastUsedStyleSet = StyleSetName;
 
-			const FString NameString = IconDescriptor->Name.ToString();
-			if (TextFilter->GetFilterType() != ETextFilterExpressionType::Empty)
-				bPassesFilter = TextFilter->TestTextFilter(FBasicStringFilterExpressionContext(NameString));
-			if (GroupFilter.IsValid() && !GroupFilter->TestFilter(*IconDescriptor))
-				bPassesFilter = false;
-			if (DrawTypeFilter.IsValid() && !DrawTypeFilter->TestFilter(*IconDescriptor))
-				bPassesFilter = false;
-			if (ImageTypeFilter.IsValid() && !ImageTypeFilter->TestFilter(*IconDescriptor))
-				bPassesFilter = false;
+		const bool bAllowNone = Switches::bShouldListContainNone && !bNoClear;
+		FSlateIconRefDataHelper::GetDataSource().GatherIconData(bAllowNone, StyleSetName, /*recursive=*/ true, IconsDataSource);
+	}
 
-			IconViewerDataSource.Add(IconDescriptor);
+	FilteredDataSource.Empty();
+	for (const TSharedPtr<FViewItem>& IconDescriptor : IconsDataSource)
+	{
+		bool bInherited = IconDescriptor->StyleSetName != StyleSetName;
+		if (bInherited && !bShowInheritedFilter)
+			continue;
+		if (TextFilter->GetFilterType() != ETextFilterExpressionType::Empty 
+			&& !TextFilter->TestTextFilter(FBasicStringFilterExpressionContext(IconDescriptor->Name.ToString())))
+			continue;
+		if (GroupFilter.IsValid() && !GroupFilter->TestFilter(*IconDescriptor))
+			continue;
+		if (DrawTypeFilter.IsValid() && !DrawTypeFilter->TestFilter(*IconDescriptor))
+			continue;
+		if (ImageTypeFilter.IsValid() && !ImageTypeFilter->TestFilter(*IconDescriptor))
+			continue;
 
-			if (bPassesFilter)
-			{
-				FilteredDataSource.Add(IconDescriptor);
-			}
-		}
+		FilteredDataSource.Add(IconDescriptor);
 	}
 
 	if (Switches::bShouldListContainNone && !bNoClear)
 	{ // add None option to list
-		auto Item = FSlateIconRefDataHelper::GetDataSource().EmptyImage;
-		IconViewerDataSource.Insert(Item, 0);
-		FilteredDataSource.Insert(Item, 0);
+		FilteredDataSource.Insert( FSlateIconRefDataHelper::GetDataSource().EmptyImage, 0);
 	}
 
 	IconViewerList->RequestListRefresh();
@@ -285,7 +285,7 @@ FReply SSlateIconViewer::OnFocusReceived(const FGeometry& MyGeometry, const FFoc
 	return FReply::Handled();
 }
 
-TSharedRef<ITableRow> SSlateIconViewer::IconViewerList_GenerateRow(TSharedPtr<SSlateIconViewer::FViewItem> Item, const TSharedRef<STableViewBase>& OwnerTable)
+TSharedRef<ITableRow> SSlateIconViewer::IconViewerList_GenerateRow(TSharedPtr<FViewItem> Item, const TSharedRef<STableViewBase>& OwnerTable)
 {
 	ensure(Item.IsValid());
 
@@ -295,7 +295,7 @@ TSharedRef<ITableRow> SSlateIconViewer::IconViewerList_GenerateRow(TSharedPtr<SS
 		.AssociatedNode(Item);
 }
 
-void SSlateIconViewer::IconViewerList_SelectionChanged(TSharedPtr<SSlateIconViewer::FViewItem> Item, ESelectInfo::Type SelectInfo)
+void SSlateIconViewer::IconViewerList_SelectionChanged(TSharedPtr<FViewItem> Item, ESelectInfo::Type SelectInfo)
 {
 	OnIconSelected.ExecuteIfBound(Item, SelectInfo);
 }
@@ -325,6 +325,18 @@ TSharedRef<SWidget> SSlateIconViewer::OptionsCombo_GenerateMenu()
 
 	MenuBuilder.BeginSection("Filters", LOCTEXT("IconViewerFiltersHeading", "Filters"));
 	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("InheritedIconMenuOption", "Show Inherited"),
+			LOCTEXT("InheritedIconMenuOptionTooltip", "Show Inherited icons."),
+			FSlateIcon(),
+			FUIAction(
+				FExecuteAction::CreateSP(this, &SSlateIconViewer::OptionsCombo_ToggleInherited),
+				FCanExecuteAction(),
+				FIsActionChecked::CreateSP(this, &SSlateIconViewer::OptionsCombo_ToggleInheritedChecked)
+			),
+			NAME_None,
+			EUserInterfaceActionType::Check
+		);
 		MenuBuilder.AddSubMenu(
 			LOCTEXT("DrawTypeMenuOption", "Draw Type"),
 			LOCTEXT("DrawTypeMenuOptionTooltip", "Filters list by specific draw type."),
@@ -337,7 +349,6 @@ TSharedRef<SWidget> SSlateIconViewer::OptionsCombo_GenerateMenu()
 			FNewMenuDelegate::CreateSP(this, &SSlateIconViewer::OptionsCombo_GenerateImageTypeSubmenu),
 			false, FSlateIcon(), false
 			);
-
 	}
 	MenuBuilder.EndSection();
 
@@ -430,9 +441,15 @@ void SSlateIconViewer::OptionsCombo_GenerateImageTypeSubmenu(FMenuBuilder& MenuB
 
 }
 
+void SSlateIconViewer::OptionsCombo_ToggleInherited()
+{
+	bShowInheritedFilter = !bShowInheritedFilter;
+	Refresh();
+}
+
 FText SSlateIconViewer::GetSelectedStyleSetIconCountText() const
 {
-	const int32 NumAssets = IconViewerDataSource.Num() + (bNoClear ? 0 : 1) ;
+	const int32 NumAssets = IconsDataSource.Num() + (bNoClear ? 0 : 1);
 	const int32 NumFilteredAssets = FilteredDataSource.Num();
 
 	FText AssetCount = LOCTEXT("IconCountLabelSingular", "1 item");
