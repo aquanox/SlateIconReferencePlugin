@@ -3,6 +3,7 @@
 #include "SlateIconRefDataHelper.h"
 
 #include "IPropertyTypeCustomization.h"
+#include "Misc/ConfigCacheIni.h"
 #include "PrivateAccessHelper.h"
 #include "PropertyHandle.h"
 #include "SlateIconRefAccessor.h"
@@ -55,6 +56,17 @@ void FSlateIconRefDataHelper::SetupStyleData()
 		EmptyImage = MakeShared<FSlateIconDescriptor>();
 		EmptyImage->DisplayTextOverride = LOCTEXT("EmptyImageName", "None");
 	}
+	
+	if (!IgnoredStyleSets.IsSet())
+	{
+		TArray<FString> Strings;
+		GConfig->GetArray(TEXT("SlateIconReference"), TEXT("IgnoredStyleSets"), Strings, GEditorIni);
+
+		TArray<FName> Names;
+		Algo::Transform(Strings, Names, [](const FString& S) -> FName { return FName(*S); });
+
+		IgnoredStyleSets = MoveTemp(Names);
+	}
 
 	KnownStyleSets.Empty();
 	KnownIcons.Empty();
@@ -63,7 +75,7 @@ void FSlateIconRefDataHelper::SetupStyleData()
 	FSlateStyleRegistry::IterateAllStyles([this](const ISlateStyle& Style)
 	{
 		FName StyleName = Style.GetStyleSetName();
-		if (StyleName.IsNone())
+		if (StyleName.IsNone() || (IgnoredStyleSets.IsSet() && IgnoredStyleSets.GetValue().Contains(StyleName)))
 			return true;
 
 		UE_LOG(LogSlateIcon, Verbose, TEXT("Found style: %s"), *StyleName.ToString());

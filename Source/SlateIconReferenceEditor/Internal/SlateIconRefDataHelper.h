@@ -89,7 +89,9 @@ public:
 	TSharedPtr<FSlateStyleSetDescriptor> EmptyStyleSet;
 	TSharedPtr<FSlateStyleSetDescriptor> AutoStyleSet;
 	TSharedPtr<FSlateIconDescriptor> EmptyImage;
-
+	
+	// ignored stylesets
+	TOptional<TArray<FName>> IgnoredStyleSets;
 	// all discovered stylesets
 	TArray<TSharedPtr<FSlateStyleSetDescriptor>> KnownStyleSets;
 	// all discovered icons
